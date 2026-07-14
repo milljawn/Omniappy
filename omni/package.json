@@ -1,0 +1,14 @@
+{
+  "name": "omni-monorepo",
+  "private": true,
+  "scripts": {
+    "dev:backend": "pnpm --filter backend dev",
+    "build:shared": "pnpm --filter shared build",
+    "build:backend": "pnpm --filter backend build",
+    "build": "pnpm build:shared && pnpm build:backend",
+    "clean": "find . -name \"node_modules\" -type d -prune -exec rm -rf '{}' + && find . -name \"dist\" -type d -prune -exec rm -rf '{}' +"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}
