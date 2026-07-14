@@ -34,6 +34,7 @@ fi
 echo "⚡ Deploying Fastify API backend server to Google Cloud Run..."
 gcloud run deploy omni-backend \
   --source . \
+  --dockerfile=Dockerfile.backend \
   --port 8080 \
   --region us-central1 \
   --allow-unauthenticated \
@@ -43,6 +44,7 @@ gcloud run deploy omni-backend \
 echo "🖥️ Deploying Next.js desktop web console to Google Cloud Run..."
 gcloud run deploy omni-web \
   --source . \
+  --dockerfile=Dockerfile.web \
   --port 3000 \
   --region us-central1 \
   --allow-unauthenticated
