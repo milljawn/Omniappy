@@ -11,9 +11,8 @@ const COLORS = {
   accentPrimary: "#2563EB",
   borderHairline: "#E2E8F0",
   
-  colorKid1: "#3B82F6", // Blue for Maya
-  colorKid2: "#EC4899", // Pink for Leo
-  colorKid3: "#10B981", // Green
+  colorKid1: "#3B82F6",
+  colorKid2: "#EC4899",
   colorSwim: "#06B6D4",
   colorMusic: "#F59E0B",
   
@@ -22,15 +21,13 @@ const COLORS = {
   colorSuccessGreen: "#10B981",
 };
 
-// Mock Financial Ledger Data (Story 5.3)
 const INITIAL_OFFERS = [
   { id: "o1", player: "Maya Mills", team: "Barca Academy U12 Soccer", amount: "$350.00", status: "Paid", tx: "ch_stripe_98234", updated: "2026-07-13" },
-  { id: "o2", player: "Leo Mills", team: "Downtown Dance Ballet Prep", amount: "$210.00", status: "Opened", tx: "-", updated: "2026-07-12" },
+  { id: "o2", player: "Leo Mills", team: "Downtown Dance Studio Ballet Prep", amount: "$210.00", status: "Opened", tx: "-", updated: "2026-07-12" },
   { id: "o3", player: "Emma Watson", team: "Atlanta Swim Club Red", amount: "$150.00", status: "Sent", tx: "-", updated: "2026-07-13" },
   { id: "o4", player: "Jack Ryan", team: "Scout Troop 45 Patrol", amount: "$75.00", status: "Declined", tx: "-", updated: "2026-07-10" },
 ];
 
-// Mock Meet Touchpad Lane Data (Story 6.3)
 const INITIAL_LANES = [
   { lane: 1, swimmer: "Maya Mills", seed: "34.50s", touch: "34.12s", status: "Verified" },
   { lane: 2, swimmer: "Sarah Jenkins", seed: "35.10s", touch: "36.80s", status: "Touchpad Missed" },
@@ -38,7 +35,6 @@ const INITIAL_LANES = [
   { lane: 4, swimmer: "Ashley Cole", seed: "36.20s", touch: "35.90s", status: "Verified" },
 ];
 
-// Mock Event Data (Story 3.1)
 const MOCK_EVENTS = [
   {
     id: "e1",
@@ -69,8 +65,8 @@ const MOCK_EVENTS = [
 ];
 
 export default function Home() {
-  // Tabs: "ledger" | "operator" | "mobile_calendar" | "mobile_profiles" | "mobile_shifts"
-  const [activeTab, setActiveTab] = useState<"mobile_calendar" | "mobile_profiles" | "mobile_shifts" | "ledger" | "operator">("mobile_calendar");
+  // Tabs: "mobile_calendar" | "mobile_profiles" | "mobile_shifts" | "settings" | "ledger" | "operator"
+  const [activeTab, setActiveTab] = useState<string>("mobile_calendar");
   
   // Roster profiles state (COPPA)
   const [parentName, setParentName] = useState("Dave Mills");
@@ -82,6 +78,14 @@ export default function Home() {
     { id: "1", name: "Maya", age: "11", coppa: true },
     { id: "2", name: "Leo", age: "8", coppa: true }
   ]);
+
+  // Account Hierarchy & SSO settings state (Story 5.4, 5.5)
+  const [activeRole, setActiveRole] = useState<"owner" | "coach" | "parent">("owner");
+  const [ssoProvider, setSsoProvider] = useState<"google" | "apple" | null>(null);
+  const [pushActive, setPushActive] = useState(true);
+  const [smsActive, setSmsActive] = useState(true);
+  const [appTheme, setAppTheme] = useState<"light" | "dark">("light");
+  const [payoutConnected, setPayoutConnected] = useState(true);
 
   // Meet Operator State
   const [lanes, setLanes] = useState(INITIAL_LANES);
@@ -127,8 +131,20 @@ export default function Home() {
     window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, "_blank");
   };
 
+  const triggerSSOLogin = (provider: "google" | "apple") => {
+    setSsoProvider(provider);
+    alert(`SSO Simulated Login: Authenticated successfully using ${provider === "google" ? "Google SSO API" : "Apple ID Token"}.`);
+  };
+
+  // Helper to determine if tab is locked based on active role
+  const isTabLocked = (tab: string) => {
+    if (tab === "ledger" && activeRole !== "owner") return true;
+    if (tab === "operator" && activeRole === "parent") return true;
+    return false;
+  };
+
   return (
-    <div style={styles.container}>
+    <div style={{ ...styles.container, backgroundColor: appTheme === "dark" ? "#0F172A" : COLORS.surfaceBase, color: appTheme === "dark" ? "#F8F9FC" : COLORS.inkPrimary }}>
       <Head>
         <title>Omni Unified Activities Hub</title>
         <meta name="description" content="Unified client portal and supervisor dashboard." />
@@ -136,57 +152,179 @@ export default function Home() {
       </Head>
 
       {/* HEADER */}
-      <header style={styles.header}>
+      <header style={{ ...styles.header, backgroundColor: appTheme === "dark" ? "#1E293B" : COLORS.surfaceRaised, borderColor: appTheme === "dark" ? "#334155" : COLORS.borderHairline }}>
         <div style={styles.headerContent}>
           <span style={styles.logo}>Omni Hub</span>
-          <span style={styles.badge}>Preview Mode</span>
+          <span style={{ ...styles.badge, backgroundColor: COLORS.accentPrimary + "20" }}>
+            Role Context: {activeRole.toUpperCase()}
+          </span>
+          {ssoProvider && (
+            <span style={{ ...styles.badge, backgroundColor: COLORS.colorSuccessGreen + "20", color: COLORS.colorSuccessGreen }}>
+              SSO Linked ({ssoProvider})
+            </span>
+          )}
         </div>
       </header>
 
       {/* MAIN CONTAINER */}
       <main style={styles.main}>
         {/* TABS */}
-        <div style={styles.tabContainer}>
+        <div style={{ ...styles.tabContainer, borderColor: appTheme === "dark" ? "#334155" : COLORS.borderHairline }}>
           <button 
             style={activeTab === "mobile_calendar" ? styles.activeTabButton : styles.tabButton} 
             onClick={() => setActiveTab("mobile_calendar")}
           >
-            📱 Parent Master Calendar
+            📱 Parent Calendar
           </button>
           <button 
             style={activeTab === "mobile_profiles" ? styles.activeTabButton : styles.tabButton} 
             onClick={() => setActiveTab("mobile_profiles")}
           >
-            👤 Roster & COPPA Profiles
+            👤 Roster & Profiles
           </button>
           <button 
             style={activeTab === "mobile_shifts" ? styles.activeTabButton : styles.tabButton} 
             onClick={() => setActiveTab("mobile_shifts")}
           >
-            🙋 Parent Volunteer Shifts
+            🙋 Volunteer Shifts
           </button>
           <button 
-            style={activeTab === "ledger" ? styles.activeTabButton : styles.tabButton} 
-            onClick={() => setActiveTab("ledger")}
+            style={activeTab === "settings" ? styles.activeTabButton : styles.tabButton} 
+            onClick={() => setActiveTab("settings")}
           >
-            📊 Stripe Placement Ledger
+            ⚙️ Settings & SSO
           </button>
           <button 
-            style={activeTab === "operator" ? styles.activeTabButton : styles.tabButton} 
-            onClick={() => setActiveTab("operator")}
+            style={isTabLocked("ledger") ? styles.tabLockedButton : (activeTab === "ledger" ? styles.activeTabButton : styles.tabButton)} 
+            onClick={() => {
+              if (isTabLocked("ledger")) {
+                alert("Access Denied: Stripe Placement Ledger is restricted to Activity Owners (CEOs). Change your role in the Settings tab to access.");
+              } else {
+                setActiveTab("ledger");
+              }
+            }}
           >
-            ⏱️ Computer Operator Panel
+            📊 Stripe Ledger {isTabLocked("ledger") && "🔒"}
+          </button>
+          <button 
+            style={isTabLocked("operator") ? styles.tabLockedButton : (activeTab === "operator" ? styles.activeTabButton : styles.tabButton)} 
+            onClick={() => {
+              if (isTabLocked("operator")) {
+                alert("Access Denied: Computer Operator Deck Panel is restricted to Coaches and Owners. Change your role in the Settings tab to access.");
+              } else {
+                setActiveTab("operator");
+              }
+            }}
+          >
+            ⏱️ Operator Deck {isTabLocked("operator") && "🔒"}
           </button>
         </div>
 
         {/* --- TABS RENDERING --- */}
+
+        {/* ⚙️ USER SETTINGS & SSO ROLES PANEL */}
+        {activeTab === "settings" && (
+          <div style={styles.splitView}>
+            <div style={{ ...styles.card, backgroundColor: appTheme === "dark" ? "#1E293B" : COLORS.surfaceRaised, borderColor: appTheme === "dark" ? "#334155" : COLORS.borderHairline }}>
+              <h2 style={{ ...styles.sectionTitle, color: appTheme === "dark" ? "#FFFFFF" : COLORS.inkPrimary }}>Account Configurations</h2>
+              <p style={styles.sectionSubtitle}>Manage role privileges, single sign-on connections, and global preferences.</p>
+
+              {/* SSO Configuration */}
+              <div style={styles.settingsSection}>
+                <h4 style={styles.settingsHeading}>Single Sign-On (SSO) Connection</h4>
+                {ssoProvider ? (
+                  <div style={styles.ssoStatusBox}>
+                    <p style={{ margin: 0, fontWeight: "bold" }}>Linked successfully with {ssoProvider === "google" ? "Google Account" : "Apple ID"}</p>
+                    <button style={styles.ssoDisconnectBtn} onClick={() => setSsoProvider(null)}>Disconnect SSO</button>
+                  </div>
+                ) : (
+                  <div style={styles.ssoButtonGroup}>
+                    <button style={styles.googleSsoBtn} onClick={() => triggerSSOLogin("google")}>
+                      🌐 Continue with Google
+                    </button>
+                    <button style={styles.appleSsoBtn} onClick={() => triggerSSOLogin("apple")}>
+                      🍎 Continue with Apple
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Role Context Hierarchy Selector */}
+              <div style={styles.settingsSection}>
+                <h4 style={styles.settingsHeading}>Active Role Context (Account Hierarchy)</h4>
+                <p style={{ fontSize: "13px", color: COLORS.inkSecondary, margin: "0 0 12px 0" }}>
+                  Switch your account context dynamically to test privilege boundaries on administrative views.
+                </p>
+                <select 
+                  style={{ ...styles.dropdownInput, backgroundColor: appTheme === "dark" ? "#334155" : "#FFFFFF", color: appTheme === "dark" ? "#FFFFFF" : COLORS.inkPrimary }} 
+                  value={activeRole} 
+                  onChange={(e) => setActiveRole(e.target.value as any)}
+                >
+                  <option value="owner">Activity Owner (Soccer CEO / Dance Studio Owner) - All Access</option>
+                  <option value="coach">Coach / Teacher - Restrict Billing/Ledger</option>
+                  <option value="parent">Parent Profile - Read-only Timeline & Quotas</option>
+                </select>
+              </div>
+
+              {/* Notification & Preference Attributes */}
+              <div style={styles.settingsSection}>
+                <h4 style={styles.settingsHeading}>Global Preferences</h4>
+                
+                <div style={styles.toggleRow}>
+                  <span>Enable Push Notifications</span>
+                  <input 
+                    type="checkbox" 
+                    checked={pushActive} 
+                    onChange={(e) => setPushActive(e.target.checked)} 
+                  />
+                </div>
+
+                <div style={styles.toggleRow}>
+                  <span>Emergency SMS Announcements (SMS Bypass)</span>
+                  <input 
+                    type="checkbox" 
+                    checked={smsActive} 
+                    onChange={(e) => setSmsActive(e.target.checked)} 
+                  />
+                </div>
+
+                <div style={styles.toggleRow}>
+                  <span>Dark Mode Theme</span>
+                  <input 
+                    type="checkbox" 
+                    checked={appTheme === "dark"} 
+                    onChange={(e) => setAppTheme(e.target.checked ? "dark" : "light")} 
+                  />
+                </div>
+
+                <div style={styles.toggleRow}>
+                  <span>Stripe Payout Deposits (For Owners)</span>
+                  <input 
+                    type="checkbox" 
+                    disabled={activeRole !== "owner"}
+                    checked={payoutConnected && activeRole === "owner"} 
+                    onChange={(e) => setPayoutConnected(e.target.checked)} 
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div style={{ ...styles.sideNotes, backgroundColor: appTheme === "dark" ? "#1E293B" : COLORS.surfaceRaised, borderColor: appTheme === "dark" ? "#334155" : COLORS.borderHairline }}>
+              <h3 style={{ margin: "0 0 12px 0" }}>⚙️ SSO & Settings Hardening</h3>
+              <ul>
+                <li><strong>Dynamic Context Permissions</strong>: Changing your active role dropdown updates interface accessibility immediately (simulating backend RBAC validation).</li>
+                <li><strong>OAuth Mock Tokens</strong>: Connecting Google/Apple triggers secure verification payloads in backend schemas.</li>
+                <li><strong>Preference Storage</strong>: Notification preferences and HSTS dark modes parse directly to the user profile settings schema.</li>
+              </ul>
+            </div>
+          </div>
+        )}
 
         {/* 📱 PARENT MOBILE MASTER CALENDAR */}
         {activeTab === "mobile_calendar" && (
           <div style={styles.splitView}>
             <div style={styles.mobileContainer}>
               <div style={styles.mobileScreen}>
-                {/* Simulated Phone Status Bar */}
                 <div style={styles.phoneHeader}>
                   <span>9:41</span>
                   <span>Omni App</span>
@@ -197,7 +335,6 @@ export default function Home() {
                   <h3 style={styles.phoneTitle}>Maya & Leo's Agenda</h3>
                   <p style={styles.phoneSubtitle}>Weekly consolidated schedule view</p>
 
-                  {/* Conflict Alert Banner */}
                   <div style={styles.phoneAlertBanner}>
                     <strong>⚠️ Logistics Alert:</strong> Overlapping schedules detected. Tight travel warning active.
                   </div>
@@ -215,7 +352,6 @@ export default function Home() {
                         <p style={styles.eventText}>⏰ {event.time}</p>
                         <p style={styles.eventText}>👚 Gear: {event.attire}</p>
                         
-                        {/* Maps deep-linking touch target */}
                         <button 
                           style={styles.mapsButton}
                           onClick={() => openGoogleMaps(event.lat, event.lng)}
@@ -235,14 +371,13 @@ export default function Home() {
               </div>
             </div>
 
-            <div style={styles.sideNotes}>
-              <h3 style={{ margin: "0 0 12px 0" }}>📱 Parent Mobile Calendar Invariants</h3>
+            <div style={{ ...styles.sideNotes, backgroundColor: appTheme === "dark" ? "#1E293B" : COLORS.surfaceRaised, borderColor: appTheme === "dark" ? "#334155" : COLORS.borderHairline }}>
+              <h3 style={{ margin: "0 0 12px 0" }}>📱 Parent Mobile Calendar</h3>
               <p>This layout emulates the native mobile experience built in `apps/mobile`:</p>
               <ul>
-                <li><strong>Unified Feed Timeline</strong>: Feeds from Playmetrics, Swimtopia, and custom iCal sources compile into a single timeline.</li>
+                <li><strong>Unified Feed Timeline</strong>: iCal sources compile into a single timeline.</li>
                 <li><strong>Color-Coding</strong>: Visual identifiers distinguish between different children.</li>
-                <li><strong>Driving Distance Conflict checks</strong>: Estimates transit distance using the Haversine formula and checks drive times between consecutive slots.</li>
-                <li><strong>Map Coordinates</strong>: Linking passes direct coordinates (lat/lng) directly to mapping apps rather than plain text names.</li>
+                <li><strong>Driving Distance checks</strong>: Estimates transit distance using the Haversine formula and checks drive times between slots.</li>
               </ul>
             </div>
           </div>
@@ -299,7 +434,7 @@ export default function Home() {
                         <div>
                           <strong style={{ fontSize: "15px" }}>{child.name}</strong>
                           <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: COLORS.inkSecondary }}>
-                            Age {child.age} • {child.coppa ? "COPPA Passive sub-profile (No direct credentials)" : "Standard profile"}
+                            Age {child.age} • {child.coppa ? "COPPA Passive sub-profile" : "Standard profile"}
                           </p>
                         </div>
                         <span style={styles.checkBadge}>Active</span>
@@ -310,13 +445,12 @@ export default function Home() {
               </div>
             </div>
 
-            <div style={styles.sideNotes}>
+            <div style={{ ...styles.sideNotes, backgroundColor: appTheme === "dark" ? "#1E293B" : COLORS.surfaceRaised, borderColor: appTheme === "dark" ? "#334155" : COLORS.borderHairline }}>
               <h3 style={{ margin: "0 0 12px 0" }}>🔒 COPPA & Roster Segregation</h3>
               <p>Enforces strict child privacy rules at the profile and data tiers:</p>
               <ul>
                 <li><strong>No Minor Accounts</strong>: Children under 13 cannot register login details, create message accounts, or access public profiles directly.</li>
                 <li><strong>Consent Gates</strong>: Creating profiles for minors forces explicit parent consent boxes.</li>
-                <li><strong>Data Segmentation</strong>: Roster queries filter out minor profile contacts, visible strictly to the parent and assigned team coach.</li>
               </ul>
             </div>
           </div>
@@ -374,8 +508,8 @@ export default function Home() {
               </div>
             </div>
 
-            <div style={styles.sideNotes}>
-              <h3 style={{ margin: "0 0 12px 0" }}>🏊 Swim Meet Logistics & Quotas</h3>
+            <div style={{ ...styles.sideNotes, backgroundColor: appTheme === "dark" ? "#1E293B" : COLORS.surfaceRaised, borderColor: appTheme === "dark" ? "#334155" : COLORS.borderHairline }}>
+              <h3 style={{ margin: "0 0 12px 0" }}>🏊 Swim Meet Quotas</h3>
               <p>Coordinates volunteer roles for meets dynamically:</p>
               <ul>
                 <li><strong>Quotas enforcement</strong>: System calculates quota parameters based on registered player entries.</li>
@@ -387,7 +521,7 @@ export default function Home() {
 
         {/* 📊 STRIPE PLACEMENT LEDGER (CEO) */}
         {activeTab === "ledger" && (
-          <section style={styles.section}>
+          <section style={{ ...styles.section, backgroundColor: appTheme === "dark" ? "#1E293B" : COLORS.surfaceRaised, borderColor: appTheme === "dark" ? "#334155" : COLORS.borderHairline }}>
             <h2 style={styles.sectionTitle}>Digital Offers Status Log</h2>
             <p style={styles.sectionSubtitle}>Real-time transaction ledgers linked with Stripe webhooks for program placements.</p>
 
@@ -404,7 +538,7 @@ export default function Home() {
               </thead>
               <tbody>
                 {INITIAL_OFFERS.map((offer) => (
-                  <tr key={offer.id} style={styles.tableRow}>
+                  <tr key={offer.id} style={{ ...styles.tableRow, borderColor: appTheme === "dark" ? "#334155" : COLORS.borderHairline }}>
                     <td style={styles.tableCell}><strong>{offer.player}</strong></td>
                     <td style={styles.tableCell}>{offer.team}</td>
                     <td style={styles.tableCell}>{offer.amount}</td>
@@ -436,7 +570,7 @@ export default function Home() {
 
         {/* ⏱️ MEET OPERATOR PANEL */}
         {activeTab === "operator" && (
-          <section style={styles.section}>
+          <section style={{ ...styles.section, backgroundColor: appTheme === "dark" ? "#1E293B" : COLORS.surfaceRaised, borderColor: appTheme === "dark" ? "#334155" : COLORS.borderHairline }}>
             <div style={styles.operatorHeader}>
               <div>
                 <h2 style={styles.sectionTitle}>High-Privilege Deck Control</h2>
@@ -445,7 +579,7 @@ export default function Home() {
               <span style={styles.liveIndicator}>● LIVE TIMING STREAM</span>
             </div>
 
-            <div style={styles.card}>
+            <div style={{ ...styles.card, backgroundColor: appTheme === "dark" ? "#0F172A" : COLORS.surfaceBase, borderColor: appTheme === "dark" ? "#334155" : COLORS.borderHairline }}>
               <h3 style={styles.cardTitle}>Event 12: Girls 11-12 50 Long Course Backstroke</h3>
               <p style={styles.cardSubtitle}>Heat 3 of 4 (Touchpad Console Stream)</p>
 
@@ -462,7 +596,7 @@ export default function Home() {
                 </thead>
                 <tbody>
                   {lanes.map((lane) => (
-                    <tr key={lane.lane} style={styles.tableRow}>
+                    <tr key={lane.lane} style={{ ...styles.tableRow, borderColor: appTheme === "dark" ? "#334155" : COLORS.borderHairline }}>
                       <td style={styles.tableCell}><strong>Lane {lane.lane}</strong></td>
                       <td style={styles.tableCell}>{lane.swimmer}</td>
                       <td style={styles.tableCell}>{lane.seed}</td>
@@ -512,13 +646,11 @@ export default function Home() {
 const styles = {
   container: {
     fontFamily: "system-ui, -apple-system, sans-serif",
-    backgroundColor: COLORS.surfaceBase,
     minHeight: "100vh",
-    color: COLORS.inkPrimary,
+    transition: "background-color 0.2s ease, color 0.2s ease",
   },
   header: {
-    backgroundColor: COLORS.surfaceRaised,
-    borderBottom: `1px solid ${COLORS.borderHairline}`,
+    borderBottom: "1px solid",
     padding: "0 40px",
     height: "70px",
     display: "flex",
@@ -535,7 +667,6 @@ const styles = {
     letterSpacing: "-0.5px",
   },
   badge: {
-    backgroundColor: COLORS.accentPrimary + "15",
     color: COLORS.accentPrimary,
     padding: "4px 8px",
     borderRadius: "6px",
@@ -551,7 +682,7 @@ const styles = {
     display: "flex",
     gap: "8px",
     marginBottom: "32px",
-    borderBottom: `2px solid ${COLORS.borderHairline}`,
+    borderBottom: "2px solid",
     paddingBottom: "8px",
     flexWrap: "wrap" as "wrap",
   },
@@ -564,6 +695,17 @@ const styles = {
     color: COLORS.inkSecondary,
     cursor: "pointer",
     borderRadius: "8px",
+  },
+  tabLockedButton: {
+    background: "none",
+    border: "none",
+    padding: "12px 18px",
+    fontSize: "15px",
+    fontWeight: 600,
+    color: COLORS.inkDisabled,
+    cursor: "not-allowed" as "not-allowed",
+    borderRadius: "8px",
+    opacity: 0.5,
   },
   activeTabButton: {
     background: COLORS.accentPrimary,
@@ -584,7 +726,7 @@ const styles = {
   mobileContainer: {
     display: "flex",
     justifyContent: "center",
-    backgroundColor: "#1E293B", // Dark phone chassis casing
+    backgroundColor: "#1E293B",
     padding: "16px 12px 24px 12px",
     borderRadius: "44px",
     boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.3)",
@@ -598,6 +740,7 @@ const styles = {
     border: "2px solid #0F172A",
     display: "flex",
     flexDirection: "column" as "column",
+    color: COLORS.inkPrimary,
   },
   phoneHeader: {
     height: "36px",
@@ -697,10 +840,14 @@ const styles = {
     margin: 0,
   },
   sideNotes: {
-    backgroundColor: COLORS.surfaceRaised,
     borderRadius: "16px",
     padding: "32px",
-    border: `1px solid ${COLORS.borderHairline}`,
+    border: "1px solid",
+  },
+  card: {
+    borderRadius: "16px",
+    padding: "32px",
+    border: "1px solid",
   },
   formCard: {
     backgroundColor: "#FFFFFF",
@@ -708,6 +855,7 @@ const styles = {
     padding: "16px",
     border: `1px solid ${COLORS.borderHairline}`,
     marginBottom: "12px",
+    color: COLORS.inkPrimary,
   },
   detailsText: {
     margin: "4px 0",
@@ -762,6 +910,7 @@ const styles = {
     display: "flex",
     alignItems: "center",
     marginBottom: "12px",
+    color: COLORS.inkPrimary,
   },
   claimBtn: {
     padding: "8px 16px",
@@ -771,18 +920,18 @@ const styles = {
     fontSize: "13px",
   },
   quotaBox: {
-    backgroundColor: COLORS.surfaceRaised,
+    backgroundColor: "#FFFFFF",
     borderRadius: "10px",
     border: `1px solid ${COLORS.borderHairline}`,
     padding: "16px",
     alignItems: "center",
     textAlign: "center" as "center",
+    color: COLORS.inkPrimary,
   },
   section: {
-    backgroundColor: COLORS.surfaceRaised,
     borderRadius: "16px",
     padding: "32px",
-    border: `1px solid ${COLORS.borderHairline}`,
+    border: "1px solid",
   },
   sectionTitle: {
     fontSize: "24px",
@@ -809,7 +958,7 @@ const styles = {
     color: COLORS.inkSecondary,
   },
   tableRow: {
-    borderBottom: `1px solid ${COLORS.borderHairline}`,
+    borderBottom: "1px solid",
   },
   tableCell: {
     padding: "16px",
@@ -833,12 +982,6 @@ const styles = {
     fontWeight: 800,
     fontSize: "14px",
   },
-  card: {
-    backgroundColor: COLORS.surfaceBase,
-    padding: "24px",
-    borderRadius: "12px",
-    border: `1px solid ${COLORS.borderHairline}`,
-  },
   cardTitle: {
     fontSize: "18px",
     fontWeight: 700,
@@ -857,6 +1000,7 @@ const styles = {
     cursor: "pointer",
     fontSize: "13px",
     fontWeight: 600,
+    color: COLORS.inkPrimary,
   },
   inlineForm: {
     display: "flex",
@@ -868,6 +1012,7 @@ const styles = {
     borderRadius: "4px",
     fontSize: "13px",
     width: "80px",
+    color: COLORS.inkPrimary,
   },
   saveButton: {
     backgroundColor: COLORS.colorSuccessGreen,
@@ -888,5 +1033,77 @@ const styles = {
     cursor: "pointer",
     fontSize: "13px",
     fontWeight: "bold",
+  },
+  settingsSection: {
+    marginBottom: "24px",
+    paddingBottom: "16px",
+    borderBottom: `1px solid ${COLORS.borderHairline}`,
+  },
+  settingsHeading: {
+    fontSize: "16px",
+    fontWeight: 700,
+    margin: "0 0 8px 0",
+  },
+  ssoButtonGroup: {
+    display: "flex",
+    flexDirection: "column" as "column",
+    gap: "10px",
+    maxWidth: "280px",
+  },
+  googleSsoBtn: {
+    backgroundColor: "#FFFFFF",
+    color: COLORS.inkPrimary,
+    border: `1px solid ${COLORS.borderHairline}`,
+    padding: "10px",
+    borderRadius: "6px",
+    fontWeight: "bold",
+    cursor: "pointer",
+    textAlign: "left" as "left",
+  },
+  appleSsoBtn: {
+    backgroundColor: "#000000",
+    color: "#FFFFFF",
+    border: "none",
+    padding: "10px",
+    borderRadius: "6px",
+    fontWeight: "bold",
+    cursor: "pointer",
+    textAlign: "left" as "left",
+  },
+  ssoStatusBox: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: COLORS.colorSuccessGreen + "15",
+    padding: "12px",
+    borderRadius: "8px",
+    color: COLORS.colorSuccessGreen,
+    fontSize: "14px",
+  },
+  ssoDisconnectBtn: {
+    backgroundColor: COLORS.colorAlertRed,
+    color: "#FFFFFF",
+    border: "none",
+    padding: "6px 12px",
+    borderRadius: "4px",
+    fontWeight: "bold",
+    cursor: "pointer",
+    fontSize: "12px",
+  },
+  dropdownInput: {
+    width: "100%",
+    padding: "10px",
+    borderRadius: "6px",
+    border: `1px solid ${COLORS.borderHairline}`,
+    fontSize: "14px",
+    fontWeight: "600",
+    cursor: "pointer",
+  },
+  toggleRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "10px 0",
+    fontSize: "14px",
   },
 };

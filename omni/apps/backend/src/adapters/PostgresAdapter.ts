@@ -1,6 +1,6 @@
 import pg from "pg";
 import { DatabasePort } from "../ports/DatabasePort.js";
-import { ParentProfile, PlayerProfile } from "@omni/shared";
+import { ParentProfile, PlayerProfile, AccountSettings } from "@omni/shared";
 import crypto from "crypto";
 
 export class PostgresAdapter implements DatabasePort {
@@ -9,6 +9,8 @@ export class PostgresAdapter implements DatabasePort {
   // In-memory fallback database simulating Row-Level Security
   private mockParents: Map<string, ParentProfile> = new Map();
   private mockPlayers: Map<string, PlayerProfile> = new Map();
+  private mockSettings: Map<string, AccountSettings> = new Map();
+  private mockRoles: Map<string, string[]> = new Map();
 
   constructor(connectionString: string) {
     try {
@@ -46,6 +48,17 @@ export class PostgresAdapter implements DatabasePort {
       dateOfBirth: new Date("2018-10-22"),
       createdAt: new Date(),
     });
+
+    // Seed settings and roles for Dave Mills
+    this.mockSettings.set(seedParentId, {
+      parentProfileId: seedParentId,
+      pushActive: true,
+      smsActive: true,
+      theme: "light",
+      payoutConnected: true,
+    });
+
+    this.mockRoles.set(seedParentId, ["parent", "owner", "coach"]);
   }
 
   private async isDbConnected(): Promise<boolean> {
@@ -86,7 +99,7 @@ export class PostgresAdapter implements DatabasePort {
     }
   }
 
-  async createParent(email: string, phone: string): Promise<ParentProfile> {
+  async createParent(email: string, phone: string, ssoProvider?: string): Promise<ParentProfile> {
     const parentId = crypto.randomUUID();
     const newParent: ParentProfile = {
       id: parentId,
@@ -99,10 +112,10 @@ export class PostgresAdapter implements DatabasePort {
       const client = await this.pool.connect();
       try {
         const res = await client.query(
-          `INSERT INTO parent_profiles (id, email, phone, created_at)
-           VALUES ($1, $2, $3, NOW())
+          `INSERT INTO parent_profiles (id, email, phone, sso_provider, created_at)
+           VALUES ($1, $2, $3, $4, NOW())
            RETURNING id, email, phone, created_at as "createdAt"`,
-          [parentId, email, phone]
+          [parentId, email, phone, ssoProvider || null]
         );
         return res.rows[0];
       } finally {
@@ -110,6 +123,14 @@ export class PostgresAdapter implements DatabasePort {
       }
     } else {
       this.mockParents.set(parentId, newParent);
+      this.mockSettings.set(parentId, {
+        parentProfileId: parentId,
+        pushActive: true,
+        smsActive: true,
+        theme: "light",
+        payoutConnected: false,
+      });
+      this.mockRoles.set(parentId, ["parent"]);
       return newParent;
     }
   }
@@ -135,7 +156,6 @@ export class PostgresAdapter implements DatabasePort {
         return res.rows[0];
       });
     } else {
-      // Simulate Database check: parent must exist
       if (!this.mockParents.has(parentId)) {
         throw new Error("Foreign key violation: Parent does not exist.");
       }
@@ -156,9 +176,8 @@ export class PostgresAdapter implements DatabasePort {
         return res.rows.length ? res.rows[0] : null;
       });
     } else {
-      // Simulate Postgres RLS: query filters by app.current_parent_id context
       if (parentId !== activeParentId) {
-        return null; // RLS blocks read across tenants
+        return null;
       }
       return this.mockParents.get(parentId) || null;
     }
@@ -176,11 +195,148 @@ export class PostgresAdapter implements DatabasePort {
         return res.rows;
       });
     } else {
-      // Simulate Postgres RLS: parent_id must match activeParentId context
       if (parentId !== activeParentId) {
-        return []; // RLS blocks access
+        return [];
       }
       return Array.from(this.mockPlayers.values()).filter(p => p.parentId === parentId);
+    }
+  }
+
+  // --- SSO, Settings & Roles Query Implementations ---
+
+  async getUserSettings(parentProfileId: string, activeParentId: string): Promise<AccountSettings> {
+    if (await this.isDbConnected() && this.pool) {
+      return this.runWithTenantContext(activeParentId, async (client) => {
+        const res = await client.query(
+          `SELECT parent_profile_id as "parentProfileId", push_active as "pushActive", sms_active as "smsActive", theme, payout_connected as "payoutConnected"
+           FROM account_settings
+           WHERE parent_profile_id = $1`,
+          [parentProfileId]
+        );
+        if (res.rows.length) return res.rows[0];
+        
+        // Insert defaults if not existing
+        const ins = await client.query(
+          `INSERT INTO account_settings (parent_profile_id, push_active, sms_active, theme, payout_connected)
+           VALUES ($1, true, true, 'light', false)
+           RETURNING parent_profile_id as "parentProfileId", push_active as "pushActive", sms_active as "smsActive", theme, payout_connected as "payoutConnected"`,
+          [parentProfileId]
+        );
+        return ins.rows[0];
+      });
+    } else {
+      let settings = this.mockSettings.get(parentProfileId);
+      if (!settings) {
+        settings = {
+          parentProfileId,
+          pushActive: true,
+          smsActive: true,
+          theme: "light",
+          payoutConnected: false,
+        };
+        this.mockSettings.set(parentProfileId, settings);
+      }
+      return settings;
+    }
+  }
+
+  async updateUserSettings(
+    parentProfileId: string,
+    settings: Partial<AccountSettings>,
+    activeParentId: string
+  ): Promise<AccountSettings> {
+    if (await this.isDbConnected() && this.pool) {
+      return this.runWithTenantContext(activeParentId, async (client) => {
+        const current = await this.getUserSettings(parentProfileId, activeParentId);
+        const merged = { ...current, ...settings };
+        
+        const res = await client.query(
+          `UPDATE account_settings
+           SET push_active = $1, sms_active = $2, theme = $3, payout_connected = $4
+           WHERE parent_profile_id = $5
+           RETURNING parent_profile_id as "parentProfileId", push_active as "pushActive", sms_active as "smsActive", theme, payout_connected as "payoutConnected"`,
+          [merged.pushActive, merged.smsActive, merged.theme, merged.payoutConnected, parentProfileId]
+        );
+        return res.rows[0];
+      });
+    } else {
+      const current = await this.getUserSettings(parentProfileId, activeParentId);
+      const merged = { ...current, ...settings };
+      this.mockSettings.set(parentProfileId, merged);
+      return merged;
+    }
+  }
+
+  async updateUserRoles(parentProfileId: string, roles: string[], activeParentId: string): Promise<string[]> {
+    if (await this.isDbConnected() && this.pool) {
+      return this.runWithTenantContext(activeParentId, async (client) => {
+        await client.query(
+          `UPDATE parent_profiles
+           SET active_roles = $1
+           WHERE id = $2`,
+          [roles, parentProfileId]
+        );
+        return roles;
+      });
+    } else {
+      this.mockRoles.set(parentProfileId, roles);
+      return roles;
+    }
+  }
+
+  async authenticateSSO(provider: string, email: string, name?: string): Promise<ParentProfile> {
+    // Look up parent by email.
+    if (await this.isDbConnected() && this.pool) {
+      const client = await this.pool.connect();
+      try {
+        const res = await client.query(
+          `SELECT id, email, phone, created_at as "createdAt"
+           FROM parent_profiles
+           WHERE email = $1`,
+          [email]
+        );
+        if (res.rows.length) {
+          // Exists, update sso provider
+          await client.query(
+            `UPDATE parent_profiles SET sso_provider = $1 WHERE email = $2`,
+            [provider, email]
+          );
+          return res.rows[0];
+        }
+        
+        // Does not exist, create
+        const newId = crypto.randomUUID();
+        const ins = await client.query(
+          `INSERT INTO parent_profiles (id, email, phone, sso_provider, created_at)
+           VALUES ($1, $2, 'Not provided', $3, NOW())
+           RETURNING id, email, phone, created_at as "createdAt"`,
+          [newId, email, provider]
+        );
+        return ins.rows[0];
+      } finally {
+        client.release();
+      }
+    } else {
+      let parent = Array.from(this.mockParents.values()).find(p => p.email === email);
+      if (!parent) {
+        const newId = crypto.randomUUID();
+        parent = {
+          id: newId,
+          email,
+          phone: "Not provided",
+          createdAt: new Date(),
+        };
+        this.mockParents.set(newId, parent);
+        this.mockSettings.set(newId, {
+          parentProfileId: newId,
+          pushActive: true,
+          smsActive: true,
+          theme: "light",
+          payoutConnected: false,
+        });
+        this.mockRoles.set(newId, ["parent"]);
+      }
+      return parent;
     }
   }
 

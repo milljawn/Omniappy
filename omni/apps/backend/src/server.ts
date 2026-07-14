@@ -329,6 +329,72 @@ server.post("/school/sync", async (request, reply) => {
   }
 });
 
+// Route: SSO Authentication Endpoint (Google/Apple)
+server.post("/auth/sso", async (request, reply) => {
+  try {
+    const { provider, email, name } = request.body as any;
+    if (!provider || !email) {
+      return reply.status(400).send({ error: "Missing SSO provider or email" });
+    }
+
+    const userProfile = await dbAdapter.authenticateSSO(provider, email, name);
+    return reply.status(210).send(userProfile);
+  } catch (error: any) {
+    return reply.status(400).send({ error: error.message });
+  }
+});
+
+// Route: Get User Account Settings
+server.get("/settings", async (request, reply) => {
+  try {
+    const activeParentId = request.headers["x-active-parent-id"] as string;
+    if (!activeParentId) {
+      return reply.status(401).send({ error: "Missing x-active-parent-id context header" });
+    }
+
+    const settings = await dbAdapter.getUserSettings(activeParentId, activeParentId);
+    return reply.status(200).send(settings);
+  } catch (error: any) {
+    return reply.status(400).send({ error: error.message });
+  }
+});
+
+// Route: Update User Account Settings
+server.put("/settings", async (request, reply) => {
+  try {
+    const activeParentId = request.headers["x-active-parent-id"] as string;
+    if (!activeParentId) {
+      return reply.status(401).send({ error: "Missing x-active-parent-id context header" });
+    }
+
+    const updates = request.body as any;
+    const updated = await dbAdapter.updateUserSettings(activeParentId, updates, activeParentId);
+    return reply.status(200).send(updated);
+  } catch (error: any) {
+    return reply.status(400).send({ error: error.message });
+  }
+});
+
+// Route: Update User Active Role Hierarchy
+server.put("/roles", async (request, reply) => {
+  try {
+    const activeParentId = request.headers["x-active-parent-id"] as string;
+    if (!activeParentId) {
+      return reply.status(401).send({ error: "Missing x-active-parent-id context header" });
+    }
+
+    const { roles } = request.body as any;
+    if (!roles || !Array.isArray(roles)) {
+      return reply.status(400).send({ error: "Roles must be an array of string values" });
+    }
+
+    const updatedRoles = await dbAdapter.updateUserRoles(activeParentId, roles, activeParentId);
+    return reply.status(200).send({ roles: updatedRoles });
+  } catch (error: any) {
+    return reply.status(400).send({ error: error.message });
+  }
+});
+
 // Start fastify server
 const start = async () => {
   try {

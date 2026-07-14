@@ -135,3 +135,28 @@ export const CreatePlayerProfileInputSchema = z.object({
 });
 
 export type CreatePlayerProfileInput = z.infer<typeof CreatePlayerProfileInputSchema>;
+
+// --- SSO, Settings & Roles Expansions ---
+
+export const UserRoleSchema = z.enum(["owner", "coach", "parent"]);
+export type UserRole = z.infer<typeof UserRoleSchema>;
+
+export const AccountSettingsSchema = z.object({
+  parentProfileId: UUID,
+  pushActive: z.boolean().default(true),
+  smsActive: z.boolean().default(true),
+  theme: z.enum(["light", "dark"]).default("light"),
+  payoutConnected: z.boolean().default(false),
+});
+
+export type AccountSettings = z.infer<typeof AccountSettingsSchema>;
+
+export const SSOAuthInputSchema = z.object({
+  provider: z.enum(["google", "apple"]),
+  token: z.string().min(1),
+  email: z.string().email(),
+  name: z.string().optional(),
+});
+
+export type SSOAuthInput = z.infer<typeof SSOAuthInputSchema>;
+
