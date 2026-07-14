@@ -10,6 +10,8 @@ import { ChatService } from "./services/chatService.js";
 import { PaymentService } from "./services/paymentService.js";
 import { EncryptionService } from "./services/encryptionService.js";
 import { ParentVueService } from "./services/parentvueService.js";
+import { FirestoreService } from "./services/firestoreService.js";
+import { BigQueryService } from "./services/bigqueryService.js";
 import dotenv from "dotenv";
 import crypto from "crypto";
 
@@ -260,6 +262,9 @@ server.post("/chat/messages", async (request, reply) => {
       targets
     );
 
+    // Stream real-time message metadata to Google Cloud Firestore (Always Free scale)
+    await FirestoreService.streamMessageToFirestore(result.message);
+
     return reply.status(210).send(result);
   } catch (error: any) {
     return reply.status(400).send({ error: error.message });
@@ -289,6 +294,9 @@ server.post("/offers/checkout", async (request, reply) => {
     
     // Simulate instantaneous Stripe webhook response
     const finalizedOffer = PaymentService.simulateWebhookPaymentSuccess(offer, `in_stripe_${crypto.randomBytes(4).toString("hex")}`);
+
+    // Append transaction ledgers to Google BigQuery (Always Free ledger analytics)
+    await BigQueryService.logOfferTransactionToBigQuery(finalizedOffer);
 
     return reply.status(200).send({ stripeIntent, finalizedOffer });
   } catch (error: any) {
